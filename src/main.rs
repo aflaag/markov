@@ -6,7 +6,7 @@ fn main() {
 
     let output = MarkovStates::<NGram<2>, 2>::from(input.as_bytes())
         .into_iter()
-        .take(100)
+        .take(1000)
         .map(|byte| byte as char)
         .collect::<String>();
 

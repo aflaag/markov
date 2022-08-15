@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-// use std::io::Read;
 // use rand::Rng;
 
 pub trait State: Hash + Eq + IntoIterator {}
@@ -23,7 +22,6 @@ impl<const N: usize> IntoIterator for NGram<N> {
 
 impl<const N: usize> ToString for NGram<N> {
     fn to_string(&self) -> String {
-        println!("funziona");
         String::from_utf8(self.ngram.to_vec()).unwrap()
     }
 }
@@ -63,6 +61,7 @@ where
             let next_states = self.states.get(&prev).unwrap();
 
             let next_char = *next_states.iter().take(1).next().unwrap();
+            println!("{:?} {}", next_states, next_char);
 
             let mut new_prev_state = [0; N];
 
