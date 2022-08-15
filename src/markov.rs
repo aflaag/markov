@@ -1,34 +1,41 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::io::Read;
 use rand::Rng;
 
-pub trait State: Hash + Clone {}
+pub trait State: Hash + Eq {}
 
-#[derive(Clone, Hash)]
-pub struct NGram {
-    ngram: String,
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct NGram<const N: usize> {
+    ngram: [u8; N],
 }
 
-impl State for NGram {}
+impl<const N: usize> State for NGram<N> {}
 
-impl ToString for NGram {
+impl<const N: usize> ToString for NGram<N> {
     fn to_string(&self) -> String {
-        self.ngram.clone()
+        todo!()
     }
 }
 
-impl FromIterator<NGram> for String {
-    fn from_iter<T: IntoIterator<Item = NGram>>(iter: T) -> Self {
+impl<const N: usize> FromIterator<NGram<N>> for String {
+    fn from_iter<T: IntoIterator<Item = NGram<N>>>(iter: T) -> Self {
         iter.into_iter().collect::<String>()
     }
 }
 
+impl<const N: usize> From<[u8; N]> for NGram<N> {
+    fn from(ngram: [u8; N]) -> Self {
+        Self { ngram }
+    }
+}
+
 pub struct MarkovIter<S: State> {
-    prev_state: S,
+    prev_state: Option<S>,
 }
 
 impl<S: State> MarkovIter<S> {
-    pub fn new(first_state: S) -> Self {
+    pub fn new(first_state: Option<S>) -> Self {
         Self { prev_state: first_state }
     }
 }
@@ -42,37 +49,56 @@ impl<S: State> Iterator for MarkovIter<S> {
 }
 
 #[derive(Clone)]
-pub struct MarkovStates<S: State>  {
-    states: HashMap<S, Vec<S>>,
+pub struct MarkovStates<S: State, const N: usize>  {
+    states: HashMap<S, HashSet<S>>,
 }
 
-impl<S: State> MarkovStates<S> {
-    pub fn iter(self) -> Option<MarkovIter<S>> {
-        self.states.into_keys().take(1).next().map(MarkovIter::new)
+impl<S: State, const N: usize> IntoIterator for MarkovStates<S, N> {
+    type Item = S;
+    type IntoIter = MarkovIter<S>;
+
+    fn into_iter(self) -> MarkovIter<S> {
+        MarkovIter::new(self.states.into_keys().take(1).next())
     }
 }
 
-impl<S: State> Default for MarkovStates<S> {
+impl<S: State, const N: usize> Default for MarkovStates<S, N> {
     fn default() -> Self {
         Self { states: HashMap::new() }
     }
 }
 
-impl<S: State> From<String> for MarkovStates<S> {
-    fn from(string: String) -> Self {
-        todo!()
+impl<S: std::fmt::Debug+ State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<S, N> {
+    fn from(chars: &[u8]) -> Self {
+        let mut states: HashMap<S, HashSet<S>> = HashMap::new();
+
+        chars
+            .windows(N * 2)
+            .for_each(|slice| {
+                let mut curr = [0; N];
+                let mut next = [0; N];
+
+                let mut bytes = slice.iter();
+
+                curr
+                    .iter_mut()
+                    .for_each(|byte| *byte = *bytes.next().unwrap());
+
+                next
+                    .iter_mut()
+                    .for_each(|byte| *byte = *bytes.next().unwrap());
+
+                let curr_state = S::from(curr);
+                let next_state = S::from(next);
+
+                if let Some(next_states) = states.get_mut(&curr_state) {
+                    next_states.insert(next_state);
+                } else {
+                    states.insert(curr_state, HashSet::from([next_state]));
+                }
+            });
+        println!("{:?}", states);
+
+        Self { states }
     }
 }
-
-// #[derive(Debug))]
-// pub enum MarkovError {
-//     MissingStates,
-// }
-//
-// impl std::fmt::Display for MarkovError {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match *self {
-//             Self::MissingStates => writeln!(f, "There are no saved states to ")
-//         }
-//     }
-// }
