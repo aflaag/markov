@@ -61,7 +61,7 @@ where
             let next_states = self.states.get(&prev).unwrap();
 
             let next_char = *next_states.iter().take(1).next().unwrap();
-            println!("{:?} {}", next_states, next_char);
+            // println!("{:?} {}", next_states, next_char);
 
             let mut new_prev_state = [0; N];
 
