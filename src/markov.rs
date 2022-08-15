@@ -1,6 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::Hash;
-// use rand::Rng;
+use indexmap::set::IndexSet;
+use rand::Rng;
 
 pub trait State: Hash + Eq + IntoIterator {}
 
@@ -40,11 +41,11 @@ impl<const N: usize> From<[u8; N]> for NGram<N> {
 
 pub struct MarkovIter<S: State, const N: usize> {
     prev_state: Option<S>,
-    states: HashMap<S, HashSet<u8>>,
+    states: HashMap<S, IndexSet<u8>>,
 }
 
 impl<S: State, const N: usize> MarkovIter<S, N> {
-    pub fn new(first_state: Option<S>, states: HashMap<S, HashSet<u8>>) -> Self {
+    pub fn new(first_state: Option<S>, states: HashMap<S, IndexSet<u8>>) -> Self {
         Self { prev_state: first_state, states }
     }
 }
@@ -58,23 +59,30 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(prev) = self.prev_state {
-            let next_states = self.states.get(&prev).unwrap();
+            if let Some(next_states) = self.states.get(&prev) {
+                let mut rng = rand::thread_rng();
 
-            let next_char = *next_states.iter().take(1).next().unwrap();
-            // println!("{:?} {}", next_states, next_char);
+                let random_idx = rng.gen_range(0..next_states.len());
 
-            let mut new_prev_state = [0; N];
+                let next_char = next_states[random_idx];
 
-            new_prev_state
-                .iter_mut()
-                .zip(prev.into_iter().skip(1))
-                .for_each(|(new_c, old_c)| *new_c = old_c.into());
+                let mut new_prev_state = [0; N];
 
-            new_prev_state[N - 1] = next_char;
+                new_prev_state
+                    .iter_mut()
+                    .zip(prev.into_iter().skip(1))
+                    .for_each(|(new_c, old_c)| *new_c = old_c.into());
 
-            self.prev_state = Some(new_prev_state.into());
-            
-            Some(next_char)
+                new_prev_state[N - 1] = next_char;
+
+                self.prev_state = Some(new_prev_state.into());
+                
+                Some(next_char)
+            } else {
+                self.prev_state = None;
+
+                None
+            }
         } else {
             None
         }
@@ -83,7 +91,7 @@ where
 
 #[derive(Clone)]
 pub struct MarkovStates<S: State, const N: usize>  {
-    states: HashMap<S, HashSet<u8>>,
+    states: HashMap<S, IndexSet<u8>>,
 }
 
 impl<S, const N: usize> IntoIterator for MarkovStates<S, N>
@@ -107,7 +115,7 @@ impl<S: State, const N: usize> Default for MarkovStates<S, N> {
 
 impl<S: std::fmt::Debug+ State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<S, N> {
     fn from(chars: &[u8]) -> Self {
-        let mut states: HashMap<S, HashSet<u8>> = HashMap::new();
+        let mut states: HashMap<S, IndexSet<u8>> = HashMap::new();
 
         chars
             .windows(N + 1)
@@ -126,7 +134,7 @@ impl<S: std::fmt::Debug+ State + From<[u8; N]>, const N: usize> From<&[u8]> for 
                 if let Some(next_chars) = states.get_mut(&curr_state) {
                     next_chars.insert(next_char);
                 } else {
-                    states.insert(curr_state, HashSet::from([next_char]));
+                    states.insert(curr_state, IndexSet::from([next_char]));
                 }
             });
 
