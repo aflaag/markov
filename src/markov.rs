@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::marker::PhantomData;
 use indexmap::set::IndexSet;
 use rand::Rng;
 
@@ -39,20 +40,21 @@ impl<const N: usize> From<[u8; N]> for NGram<N> {
     }
 }
 
-pub struct MarkovIter<S: State, const N: usize> {
-    prev_state: Option<S>,
-    states: HashMap<S, IndexSet<u8>>,
+pub struct MarkovIter<'m, S: State, const N: usize> {
+    states: &'m HashMap<S, IndexSet<u8>>,
+    prev_state: Option<&'m S>,
 }
 
-impl<S: State, const N: usize> MarkovIter<S, N> {
-    pub fn new(first_state: Option<S>, states: HashMap<S, IndexSet<u8>>) -> Self {
-        Self { prev_state: first_state, states }
+impl<'m, S: State, const N: usize> MarkovIter<'m, S, N> {
+    pub fn new(states: &'m HashMap<S, IndexSet<u8>>, first_state: Option<&'m S>) -> Self {
+        Self { states, prev_state: first_state }
     }
 }
 
-impl<S, const N: usize> Iterator for MarkovIter<S, N>
+impl<'m, S, const N: usize> Iterator for MarkovIter<'m, S, N>
 where
-    S: State + Clone + Copy + From<[u8; N]>,
+    S: State + Clone + Copy,
+    [u8; N]: Into<&'m S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
     type Item = u8;
@@ -90,30 +92,34 @@ where
 }
 
 #[derive(Clone)]
-pub struct MarkovStates<S: State, const N: usize>  {
+pub struct MarkovStates<'m, S: State, const N: usize>  {
     states: HashMap<S, IndexSet<u8>>,
+    _marker: PhantomData<&'m S>,
 }
 
-impl<S, const N: usize> IntoIterator for MarkovStates<S, N>
+impl<'m, S, const N: usize> IntoIterator for MarkovStates<'m, S, N>
 where
-    S: State + Clone + Copy + From<[u8; N]>,
+    S: State + Clone + Copy,
+    [u8; N]: Into<&'m S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
     type Item = u8;
-    type IntoIter = MarkovIter<S, N>;
+    type IntoIter = MarkovIter<'m, S, N>;
 
-    fn into_iter(self) -> MarkovIter<S, N> {
-        MarkovIter::new(self.states.clone().into_keys().take(1).next(), self.states)
+    fn into_iter(self) -> MarkovIter<'m, S, N> {
+        let first_state = self.states.keys().take(1).next();
+
+        MarkovIter::new(&self.states, first_state)
     }
 }
 
-impl<S: State, const N: usize> Default for MarkovStates<S, N> {
+impl<'m, S: State, const N: usize> Default for MarkovStates<'m, S, N> {
     fn default() -> Self {
-        Self { states: HashMap::new() }
+        Self { states: HashMap::new(), _marker: PhantomData::default() }
     }
 }
 
-impl<S: std::fmt::Debug+ State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<S, N> {
+impl<'m, S: State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<'m, S, N> {
     fn from(chars: &[u8]) -> Self {
         let mut states: HashMap<S, IndexSet<u8>> = HashMap::new();
 
@@ -138,6 +144,6 @@ impl<S: std::fmt::Debug+ State + From<[u8; N]>, const N: usize> From<&[u8]> for 
                 }
             });
 
-        Self { states }
+        Self { states, _marker: PhantomData::default() }
     }
 }
