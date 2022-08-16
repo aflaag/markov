@@ -92,7 +92,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct MarkovStates<'m, S: State, const N: usize>  {
+pub struct MarkovStates<'m, S: State, const N: usize> {
     states: HashMap<S, IndexSet<u8>>,
     _marker: PhantomData<&'m S>,
 }
