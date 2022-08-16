@@ -42,11 +42,11 @@ impl<const N: usize> From<[u8; N]> for NGram<N> {
 
 pub struct MarkovIter<'m, S: State, const N: usize> {
     states: &'m HashMap<S, IndexSet<u8>>,
-    prev_state: Option<&'m S>,
+    prev_state: Option<S>,
 }
 
 impl<'m, S: State, const N: usize> MarkovIter<'m, S, N> {
-    pub fn new(states: &'m HashMap<S, IndexSet<u8>>, first_state: Option<&'m S>) -> Self {
+    pub fn new(states: &'m HashMap<S, IndexSet<u8>>, first_state: Option<S>) -> Self {
         Self { states, prev_state: first_state }
     }
 }
@@ -54,7 +54,7 @@ impl<'m, S: State, const N: usize> MarkovIter<'m, S, N> {
 impl<'m, S, const N: usize> Iterator for MarkovIter<'m, S, N>
 where
     S: State + Clone + Copy,
-    [u8; N]: Into<&'m S>,
+    [u8; N]: Into<S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
     type Item = u8;
@@ -97,19 +97,17 @@ pub struct MarkovStates<'m, S: State, const N: usize>  {
     _marker: PhantomData<&'m S>,
 }
 
-impl<'m, S, const N: usize> IntoIterator for MarkovStates<'m, S, N>
+impl<'m, S, const N: usize> IntoIterator for &'m MarkovStates<'m, S, N>
 where
     S: State + Clone + Copy,
-    [u8; N]: Into<&'m S>,
+    [u8; N]: Into<S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
     type Item = u8;
     type IntoIter = MarkovIter<'m, S, N>;
 
     fn into_iter(self) -> MarkovIter<'m, S, N> {
-        let first_state = self.states.keys().take(1).next();
-
-        MarkovIter::new(&self.states, first_state)
+        MarkovIter::new(&self.states, self.states.keys().next().copied())
     }
 }
 
