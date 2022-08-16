@@ -40,20 +40,22 @@ impl<const N: usize> From<[u8; N]> for NGram<N> {
     }
 }
 
-pub struct MarkovIter<'m, S: State, const N: usize> {
+pub struct MarkovIter<'m, S: State, const N: usize, R: Rng + ?Sized + Clone> {
     states: &'m HashMap<S, IndexSet<u8>>,
     prev_state: Option<S>,
+    rng: R
 }
 
-impl<'m, S: State, const N: usize> MarkovIter<'m, S, N> {
-    pub fn new(states: &'m HashMap<S, IndexSet<u8>>, first_state: Option<S>) -> Self {
-        Self { states, prev_state: first_state }
+impl<'m, S: State, const N: usize, R: Rng + ?Sized + Clone> MarkovIter<'m, S, N, R> {
+    pub fn new(states: &'m HashMap<S, IndexSet<u8>>, first_state: Option<S>, rng: R) -> Self {
+        Self { states, prev_state: first_state, rng }
     }
 }
 
-impl<'m, S, const N: usize> Iterator for MarkovIter<'m, S, N>
+impl<'m, S, const N: usize, R> Iterator for MarkovIter<'m, S, N, R>
 where
     S: State + Clone + Copy,
+    R: Rng + ?Sized + Clone,
     [u8; N]: Into<S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
@@ -62,9 +64,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(prev) = self.prev_state {
             if let Some(next_states) = self.states.get(&prev) {
-                let mut rng = rand::thread_rng();
-
-                let random_idx = rng.gen_range(0..next_states.len());
+                let random_idx = self.rng.gen_range(0..next_states.len());
 
                 let next_char = next_states[random_idx];
 
@@ -92,34 +92,29 @@ where
 }
 
 #[derive(Clone)]
-pub struct MarkovStates<'m, S: State, const N: usize> {
+pub struct MarkovStates<'m, S: State, const N: usize, R: Rng + ?Sized + Clone> {
     states: HashMap<S, IndexSet<u8>>,
     _marker: PhantomData<&'m S>,
+    rng: R,
 }
 
-
-impl<'m, S, const N: usize> IntoIterator for &'m MarkovStates<'m, S, N>
+impl<'m, S, const N: usize, R> IntoIterator for &'m MarkovStates<'m, S, N, R>
 where
     S: State + Clone + Copy,
+    R: Rng + ?Sized + Clone,
     [u8; N]: Into<S>,
     <S as IntoIterator>::Item: Into<u8>,
 {
     type Item = u8;
-    type IntoIter = MarkovIter<'m, S, N>;
+    type IntoIter = MarkovIter<'m, S, N, R>;
 
-    fn into_iter(self) -> MarkovIter<'m, S, N> {
-        MarkovIter::new(&self.states, self.states.keys().next().copied())
+    fn into_iter(self) -> MarkovIter<'m, S, N, R> {
+        MarkovIter::new(&self.states, self.states.keys().next().copied(), self.rng.clone())
     }
 }
 
-impl<'m, S: State, const N: usize> Default for MarkovStates<'m, S, N> {
-    fn default() -> Self {
-        Self { states: HashMap::new(), _marker: PhantomData::default() }
-    }
-}
-
-impl<'m, S: State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<'m, S, N> {
-    fn from(chars: &[u8]) -> Self {
+impl<'m, S: State + From<[u8; N]>, const N: usize, R: Rng + ?Sized + Clone> MarkovStates<'m, S, N, R> {
+    pub fn from_random(chars: &[u8], rng: R) -> Self {
         let mut states: HashMap<S, IndexSet<u8>> = HashMap::new();
 
         chars
@@ -143,6 +138,6 @@ impl<'m, S: State + From<[u8; N]>, const N: usize> From<&[u8]> for MarkovStates<
                 }
             });
 
-        Self { states, _marker: PhantomData::default() }
+        Self { states, _marker: PhantomData::default(), rng }
     }
 }

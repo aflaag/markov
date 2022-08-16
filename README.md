@@ -1,7 +1,4 @@
 # markov
 
-still WIP don't bother me
+This program generates random chunks of text based on the given input by using Markov chains.
 
-## TODO list
-
-- fix rng because it stinks
