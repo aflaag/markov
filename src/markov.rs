@@ -97,6 +97,7 @@ pub struct MarkovStates<'m, S: State, const N: usize> {
     _marker: PhantomData<&'m S>,
 }
 
+
 impl<'m, S, const N: usize> IntoIterator for &'m MarkovStates<'m, S, N>
 where
     S: State + Clone + Copy,
